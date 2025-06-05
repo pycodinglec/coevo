@@ -6,13 +6,50 @@ from judge import get_strategies, play_full_league, make_report, payoff
 import pandas as pd
 from openai import OpenAI
 
+def check_password():
+    """비밀번호 확인 함수"""
+    def password_entered():
+        """비밀번호가 입력되었을 때 호출되는 함수"""
+        if st.session_state["password"] == st.secrets["passwords"]["app_password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # 비밀번호는 메모리에서 삭제
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # 첫 실행시
+        st.text_input(
+            "🔐 비밀번호를 입력하세요", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        return False
+    elif not st.session_state["password_correct"]:
+        # 비밀번호가 틀린 경우
+        st.text_input(
+            "🔐 비밀번호를 입력하세요", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        st.error("😞 비밀번호가 올바르지 않습니다.")
+        return False
+    else:
+        # 비밀번호가 맞는 경우
+        return True
+
 def generate_strategy_code(description, strategy_name):
     """OpenAI를 사용하여 자연어 설명을 바탕으로 전략 코드를 생성"""
     
-    # 환경변수에서 OpenAI API 키 가져오기
-    api_key = os.getenv('OPENAI_API_KEY')
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY 환경변수가 설정되지 않았습니다.")
+    # Streamlit secrets에서 OpenAI API 키 가져오기
+    try:
+        api_key = st.secrets["api_keys"]["openai_api_key"]
+    except KeyError:
+        # secrets.toml에 없으면 환경변수에서 가져오기 (백업)
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            raise ValueError("OpenAI API 키가 설정되지 않았습니다. secrets.toml 파일을 확인하세요.")
     
     client = OpenAI(api_key=api_key)
     
@@ -123,8 +160,32 @@ def main():
     st.title("🎮 죄수의 딜레마 전략 생성기")
     st.markdown("### 협력의 진화 - 나만의 전략을 만들어보세요!")
     
-    # 사이드바: 도움말
+    # 사이드바: 비밀번호 입력 및 도움말
     with st.sidebar:
+        st.markdown("### 🔑 접근 권한")
+        
+        # 비밀번호 확인
+        if not check_password():
+            st.stop()  # 비밀번호가 틀리면 여기서 앱 실행 중단
+        
+        # 로그인 성공 메시지
+        st.success("✅ 로그인 성공!")
+        
+        # 로그아웃 버튼
+        if st.button("🚪 로그아웃"):
+            st.session_state["password_correct"] = False
+            st.rerun()
+        
+        # 새로고침 버튼
+        if st.button("🔄 새로고침 (새 전략 생성)"):
+            # 전체 세션 상태 초기화
+            for key in list(st.session_state.keys()):
+                if key != "password_correct":  # 로그인 상태는 유지
+                    del st.session_state[key]
+            st.rerun()
+        
+        st.markdown("---")
+        
         st.markdown("### 📚 전략 설명 예시")
         st.markdown("""
         - "항상 협력하는 전략"
@@ -135,6 +196,33 @@ def main():
         - "한번 배신당하면 계속 보복하는 전략"
         - "랜덤하게 행동하는 전략"
         """)
+        
+        st.markdown("### 📝 전략 이름 가이드")
+        st.markdown("""
+        **좋은 예시:**
+        - `나만의전략`
+        - `똑똑한팃포탯`
+        - `복수전략`
+        - `확률적전략`
+        
+        **피해야 할 것:**
+        - `나만의 전략` ❌ (띄어쓰기)
+        - `전략 이름` ❌ (띄어쓰기)
+        """)
+        
+        st.info("💡 띄어쓰기는 자동으로 언더스코어(_)로 변경됩니다!")
+        
+        st.markdown("### 🔄 새 전략 만들기")
+        st.markdown("""
+        **새로운 전략을 만들고 싶다면:**
+        
+        상단의 **🔄 새로고침** 버튼을 클릭하세요!
+        
+        - 입력창 초기화
+        - 생성된 코드 삭제
+        - 세션 상태 완전 리셋
+        """)
+        st.warning("⚠️ 현재 작업 중인 전략이 모두 삭제됩니다.")
     
     # 메인 화면
     st.markdown("#### 1️⃣ 전략 설명을 자연어로 입력하세요")
@@ -144,35 +232,64 @@ def main():
         height=100
     )
     
-    strategy_name = st.text_input(
+    strategy_name_input = st.text_input(
         "전략 이름을 입력하세요",
-        placeholder="예: 나는가끔과거를잊는다",
-        max_chars=30
+        placeholder="예: 나는가끔과거를잊는다, 똑똑한팃포탯, 복수전략",
+        max_chars=30,
+        help="⚠️ 전략 이름에는 띄어쓰기를 사용할 수 없습니다. 띄어쓰기는 자동으로 언더스코어(_)로 변경됩니다."
     )
+    
+    # 띄어쓰기를 언더스코어로 자동 변환
+    strategy_name = strategy_name_input.replace(" ", "_") if strategy_name_input else ""
+    
+    # 변환된 이름 표시 (원래 입력과 다른 경우)
+    if strategy_name_input and strategy_name != strategy_name_input:
+        st.info(f"📝 전략 이름이 자동 변환되었습니다: **{strategy_name}**")
+    elif strategy_name and not " " in strategy_name_input:
+        st.success(f"✅ 전략 이름: **{strategy_name}**")
+    
+    # 처리 시간 안내 (항상 표시)
+    st.info("⏱️ **처리 시간 안내**: o4-mini 추론 모델은 고품질 코드 생성을 위해 **10-30초** 정도 소요됩니다.")
     
     if st.button("🔄 전략 코드 생성"):
         if strategy_description and strategy_name:
-            # 전략 코드 생성
-            strategy_code = generate_strategy_code(strategy_description, strategy_name)
-            
-            st.markdown("#### 2️⃣ 생성된 전략 코드")
-            st.code(strategy_code, language='python')
-            
-            # 세션 상태에 저장
-            st.session_state.strategy_code = strategy_code
-            st.session_state.strategy_name = strategy_name
-            st.session_state.strategy_description = strategy_description
-            
-            # 파일 다운로드
-            st.download_button(
-                label="📁 전략 파일 다운로드",
-                data=strategy_code,
-                file_name=f"{strategy_name.lower()}.py",
-                mime="text/plain"
-            )
+            # 로딩 표시와 함께 전략 코드 생성
+            with st.spinner("🤖 o4-mini가 전략을 분석하고 있습니다... (약 10-30초 소요)"):
+                try:
+                    # 진행 상황 표시
+                    progress_text = st.empty()
+                    progress_text.text("🧠 전략 로직 분석 중...")
+                    
+                    strategy_code = generate_strategy_code(strategy_description, strategy_name)
+                    
+                    progress_text.text("✅ 코드 생성 완료!")
+                    progress_text.empty()  # 진행 상황 텍스트 제거
+                    
+                    # 세션 상태에 저장
+                    st.session_state.strategy_code = strategy_code
+                    st.session_state.strategy_name = strategy_name
+                    st.session_state.strategy_description = strategy_description
+                    
+                except Exception as e:
+                    st.error(f"❌ 코드 생성 중 오류가 발생했습니다: {str(e)}")
+                    st.stop()
             
         else:
             st.warning("전략 설명과 이름을 모두 입력해주세요!")
+    
+    # 생성된 코드가 있으면 항상 표시 (다운로드 후에도 유지)
+    if hasattr(st.session_state, 'strategy_code') and st.session_state.strategy_code:
+        st.markdown("#### 2️⃣ 생성된 전략 코드")
+        st.code(st.session_state.strategy_code, language='python')
+        
+        # 파일 다운로드 버튼 (항상 표시)
+        st.download_button(
+            label="📁 전략 파일 다운로드",
+            data=st.session_state.strategy_code,
+            file_name=f"{st.session_state.strategy_name.lower()}.py",
+            mime="text/plain",
+            key="download_strategy"  # 고유 키 추가
+        )
     
     # 미니 리그전 실행
     if hasattr(st.session_state, 'strategy_code'):
