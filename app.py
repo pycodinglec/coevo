@@ -223,6 +223,20 @@ def main():
         - 세션 상태 완전 리셋
         """)
         st.warning("⚠️ 현재 작업 중인 전략이 모두 삭제됩니다.")
+        
+        st.markdown("### ⚠️ 서버 안정성 안내")
+        st.markdown("""
+        **미니 리그전 기능 비활성화**
+        
+        웹 서버의 안정성을 위해 CPU 집약적인 
+        리그전 시뮬레이션을 비활성화했습니다.
+        
+        **대안:**
+        1. 전략 파일 다운로드
+        2. 로컬에서 `python judge.py` 실행
+        3. 전체 리그전 결과 확인
+        """)
+        st.info("💻 로컬 환경에서는 모든 기능이 정상 작동합니다!")
     
     # 메인 화면
     st.markdown("#### 1️⃣ 전략 설명을 자연어로 입력하세요")
@@ -291,12 +305,19 @@ def main():
             key="download_strategy"  # 고유 키 추가
         )
     
-    # 미니 리그전 실행
+    # 미니 리그전 실행 (현재 비활성화)
     if hasattr(st.session_state, 'strategy_code'):
         st.markdown("#### 3️⃣ 미니 리그전 테스트")
         st.markdown("새로 만든 전략을 **팃포탯, 올디, 다우닝**과 리그전을 치러보세요!")
         
-        if st.button("⚔️ 미니 리그전 시작!"):
+        # 리그전 버튼 비활성화
+        st.warning("⚠️ **미니 리그전 기능이 일시적으로 비활성화되었습니다.**")
+        st.info("💡 웹 서버 안정성을 위해 CPU 집약적인 리그전 시뮬레이션을 비활성화했습니다. 생성된 전략 파일을 다운로드하여 로컬에서 `python judge.py`로 테스트해보세요!")
+        
+        # 비활성화된 버튼 표시
+        st.button("⚔️ 미니 리그전 시작!", disabled=True, help="현재 비활성화됨 - 서버 안정성을 위해")
+        
+        if False:  # 실행되지 않도록 False로 설정
             with st.spinner("미니 리그전 진행 중..."):
                 try:
                     result_content, strategies = run_mini_league(
