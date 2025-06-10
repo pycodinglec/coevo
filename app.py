@@ -67,6 +67,7 @@ def generate_strategy_code(description, strategy_name):
 4. 첫 게임일 때는 len(mine) == 0 또는 len(yours) == 0 입니다
 5. 필요시 random 모듈을 import할 수 있습니다
 6. 주석으로 전략의 동작을 설명해주세요
+7. 파일 내부에서 절대로 global variable을 설정하지 않습니다.
 
 기존 전략 예시:
 - 팃포탯: 첫 게임은 협력, 이후 상대방의 직전 행동을 따라함
